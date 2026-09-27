@@ -112,6 +112,27 @@ export const api = {
     return res.json();
   },
 
+  // Raw sensor readings — row per reading, cursor-paginated with
+  // after_created_at / after_id (used by the "More History" button on the
+  // PDB / UPS events modals).
+  async getRawHistory(sa_code, { start_date, end_date, limit = 500, after_created_at, after_id } = {}) {
+    const params = new URLSearchParams();
+    if (start_date) params.set("start_date", start_date);
+    if (end_date) params.set("end_date", end_date);
+    params.set("limit", limit);
+    if (after_created_at) params.set("after_created_at", after_created_at);
+    if (after_id !== undefined && after_id !== null) params.set("after_id", after_id);
+    const res = await fetch(`${base}/api/devices/${encodeURIComponent(sa_code)}/raw?${params.toString()}`);
+    if (!res.ok) throw new Error("Failed to fetch raw history");
+    return res.json();
+  },
+
+  async getUpsEvents(sa_code, page = 1, limit = 300) {
+    const res = await fetch(`${base}/api/devices/${encodeURIComponent(sa_code)}/ups1-events?page=${page}&limit=${limit}`);
+    if (!res.ok) throw new Error("Failed to fetch UPS events");
+    return res.json();
+  },
+
   // ── SA Down table (replaces the old /api/devices/system-down table) ────────
   async getSaStatusList() {
     const res = await fetch(`${base}/api/sa-status`);

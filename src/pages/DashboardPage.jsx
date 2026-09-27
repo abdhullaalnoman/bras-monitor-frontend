@@ -11,6 +11,7 @@ import {
   SystemPowerEventsModal,
   SaStatusEventsModal,
   PdbEventsModal,
+  UpsEventsModal,
 } from "../components/SystemPowerEventsModal";
 import logo from "../../assets/logo.svg";
 
@@ -111,15 +112,29 @@ function sortPdbByDowntime(a, b) {
   return (Number(uk && a?.[uk]) || 0) - (Number(uk && b?.[uk]) || 0);
 }
 
-// Signal column: "signal": "OK" | "NO_SIGNAL" (matches loosely on key + value)
+// Signal column: "signal": "OK" | "NO_SIGNAL" (matches loosely on key + value).
+// A row also counts as No Signal when its last_seen_at is more than 5 minutes
+// old — even with no explicit signal field, stale data means the device has
+// stopped reporting. Used by both the PDB and UPS tables.
+const NO_SIGNAL_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
 function pdbSignalOf(d) {
   const k = Object.keys(d || {}).find((x) => keyTokens(x).includes("signal"));
   return k ? d[k] : null;
 }
 
+function pdbIsStale(lastSeenVal) {
+  if (!lastSeenVal) return false;
+  const t = new Date(lastSeenVal).getTime();
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t > NO_SIGNAL_STALE_MS;
+}
+
 function pdbHasNoSignal(d) {
   const v = pdbSignalOf(d);
-  return String(v || "").trim().toUpperCase() === "NO_SIGNAL";
+  if (String(v || "").trim().toUpperCase() === "NO_SIGNAL") return true;
+  const lastSeenVal = pdbPick(d, "last_seen_at", "last_seen", "lastseen");
+  return pdbIsStale(lastSeenVal);
 }
 
 function pdbStatusOf(d) {
@@ -266,9 +281,11 @@ export default function DashboardPage({
   const [statusFilter, setStatusFilter] = useState(null);
   const [filteredByStatus, setFilteredByStatus] = useState([]);
   const [statusLoading, setStatusLoading] = useState(false);
-  const [tableView, setTableView] = useState("bras"); // "bras" | "pdb" | "sadown"
+  const [tableView, setTableView] = useState("bras"); // "bras" | "pdb" | "ups" | "sadown"
   const [pdbData, setPdbData] = useState([]);
   const [pdbLoading, setPdbLoading] = useState(false);
+  const [upsData, setUpsData] = useState([]);
+  const [upsLoading, setUpsLoading] = useState(false);
   const [systemDownCount, setSystemDownCount] = useState(0);
   const [sysDownData, setSysDownData] = useState([]);
   const [sysDownLoading, setSysDownLoading] = useState(false);
@@ -277,18 +294,20 @@ export default function DashboardPage({
   const [historySa, setHistorySa] = useState(null); // sa_code string — opens SaStatusEventsModal
   const [promptOpen, setPromptOpen] = useState(false);
   const [historyPdbSa, setHistoryPdbSa] = useState(null); // sa_code string (PDB events modal)
+  const [historyUpsSa, setHistoryUpsSa] = useState(null); // sa_code string (UPS events modal)
   const timerRef = useRef(null);
   const countdownRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [data, powerData, pdbRes, sysDownRes] = await Promise.all([
+      const [data, powerData, pdbRes, upsRes, sysDownRes] = await Promise.all([
         api.getRouters(),
         // Backup data is a separate, newer endpoint — don't let it failing
         // take down the whole dashboard, just leave the Backup column blank.
         api.getBrasPowerStatus().catch(() => []),
-        // PDB + SA Down feed the top cards / PDB table; failures stay silent.
+        // PDB + UPS + SA Down feed the top cards / tables; failures stay silent.
         api.getDeviceLiveSummary("pdb").catch(() => null),
+        api.getDeviceLiveSummary("ups1").catch(() => null),
         api.getSaStatusList().catch(() => null),
       ]);
       const arr = Array.isArray(data) ? data : data.data || data.routers || [];
@@ -299,6 +318,9 @@ export default function DashboardPage({
       setPowerStatus(pArr);
       if (pdbRes) {
         setPdbData(Array.isArray(pdbRes) ? pdbRes : pdbRes.data || []);
+      }
+      if (upsRes) {
+        setUpsData(Array.isArray(upsRes) ? upsRes : upsRes.data || []);
       }
       if (sysDownRes) {
         const sdArr = Array.isArray(sysDownRes) ? sysDownRes : sysDownRes.data || [];
@@ -415,6 +437,22 @@ export default function DashboardPage({
     }
   }
 
+  async function handleUpsCardClick() {
+    setTableView("ups");
+    setSearch("");
+    setStatusFilter(null);
+    setFilteredByStatus([]);
+    setUpsLoading(true);
+    try {
+      const data = await api.getDeviceLiveSummary("ups1");
+      setUpsData(Array.isArray(data) ? data : data.data || []);
+    } catch (e) {
+      setError("API connection error: " + e.message);
+    } finally {
+      setUpsLoading(false);
+    }
+  }
+
   async function handleSystemDownCardClick() {
     setTableView("sadown");
     setSearch("");
@@ -472,6 +510,20 @@ export default function DashboardPage({
   );
   const pdbUp = pdbData.filter(pdbIsUp).length;
   const pdbDown = pdbData.filter(pdbIsDown).length;
+
+  // UPS table — same fixed set (#, SA Name, Status, Down Time, Up Time, Down 24h,
+  // Up 24h, UPS) and the same highest-downtime -> lowest-uptime sort as PDB.
+  const upsFiltered = [...upsData].sort(sortPdbByDowntime).filter((d) =>
+    !search
+      ? true
+      : Object.entries(d).some(
+          ([k, v]) =>
+            !PDB_HIDDEN_COLUMNS.has(k) &&
+            String(v ?? "").toLowerCase().includes(search.toLowerCase()),
+        ),
+  );
+  const upsUp = upsData.filter(pdbIsUp).length;
+  const upsDown = upsData.filter(pdbIsDown).length;
 
   const handleLogout = async () => {
     await logout();
@@ -691,27 +743,12 @@ export default function DashboardPage({
       </nav>
 
       <div className="flex-1 flex flex-col max-w-screen-2xl mx-auto w-full px-4 sm:px-6 py-6">
-        {/* Stats Cards — Total SA / BRAS / PDB / SA Down */}
+        {/* Stats Cards — BRAS / PDB / UPS / SA Down */}
         <style>{`
           @keyframes saSlowBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
           .sa-slow-blink { animation: saSlowBlink 2.4s ease-in-out infinite; }
         `}</style>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {/* Total SA — not clickable */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 select-none">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                Total SA
-              </span>
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-2xl font-black text-cyan-400">{routers.length}</div>
-          </div>
-
           {/* BRAS — clickable */}
           <div
             onClick={handleBrasCardClick}
@@ -764,6 +801,34 @@ export default function DashboardPage({
               <span className="text-sm font-semibold text-slate-500"> up</span>
               <span className="text-slate-700 mx-2">/</span>
               <span className={pdbDown > 0 ? "text-red-400" : "text-slate-400"}>{pdbDown}</span>
+              <span className="text-sm font-semibold text-slate-500"> down</span>
+            </div>
+          </div>
+
+          {/* UPS — clickable */}
+          <div
+            onClick={handleUpsCardClick}
+            className={`bg-slate-900/60 border rounded-2xl p-4 transition-all select-none cursor-pointer hover:border-slate-600 ${
+              tableView === "ups"
+                ? "border-blue-500/60 ring-1 ring-blue-500/30 bg-blue-500/5"
+                : "border-slate-800"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                UPS
+              </span>
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-2xl font-black text-blue-400">
+              {upsUp}
+              <span className="text-sm font-semibold text-slate-500"> up</span>
+              <span className="text-slate-700 mx-2">/</span>
+              <span className={upsDown > 0 ? "text-red-400" : "text-slate-400"}>{upsDown}</span>
               <span className="text-sm font-semibold text-slate-500"> down</span>
             </div>
           </div>
@@ -978,18 +1043,20 @@ export default function DashboardPage({
               <span className="text-white font-bold text-sm">
                 {tableView === "pdb"
                   ? "PDB Monitoring Table"
-                  : tableView === "sadown"
-                    ? "SA System Monitoring Table"
-                    : "BRAS Monitoring Table"}
+                  : tableView === "ups"
+                    ? "UPS Monitoring Table"
+                    : tableView === "sadown"
+                      ? "SA System Monitoring Table"
+                      : "BRAS Monitoring Table"}
               </span>
               {search && (
                 <span className="text-xs text-slate-400 bg-slate-800 rounded-lg px-2 py-1">
-                  {tableView === "pdb" ? pdbFiltered.length : tableView === "sadown" ? saStatusFiltered.length : filtered.length} results for "{search}"
+                  {tableView === "pdb" ? pdbFiltered.length : tableView === "ups" ? upsFiltered.length : tableView === "sadown" ? saStatusFiltered.length : filtered.length} results for "{search}"
                 </span>
               )}
               {!search && !statusFilter && (
                 <span className="text-xs text-slate-600">
-                  {tableView === "pdb" ? pdbFiltered.length : tableView === "sadown" ? saStatusFiltered.length : filtered.length} total
+                  {tableView === "pdb" ? pdbFiltered.length : tableView === "ups" ? upsFiltered.length : tableView === "sadown" ? saStatusFiltered.length : filtered.length} total
                 </span>
               )}
             </div>
@@ -1045,7 +1112,7 @@ export default function DashboardPage({
             */}
           </div>
 
-          {loading || statusLoading || (tableView === "pdb" && pdbLoading) || (tableView === "sadown" && sysDownLoading) ? (
+          {loading || statusLoading || (tableView === "pdb" && pdbLoading) || (tableView === "ups" && upsLoading) || (tableView === "sadown" && sysDownLoading) ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <svg
@@ -1152,6 +1219,98 @@ export default function DashboardPage({
                           </td>
                           <td className="px-5 py-3.5">
                             <span className="text-slate-300 text-xs">{rca || "—"}</span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : tableView === "ups" ? (
+            /* UPS Monitoring Table — same as PDB, but only # / SA Name / Status /
+               Down Time / Up Time / Down 24h / Up 24h / UPS */
+            <div className="flex-1">
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col style={{ width: "4%" }} />
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "10%" }} />
+                </colgroup>
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-800 text-slate-400 text-xs uppercase tracking-wider">
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom">#</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">SA Name</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">Status</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">Down Time</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">Up Time</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">Down 24h</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">Up 24h</th>
+                    <th className="text-left px-1.5 py-2.5 font-semibold align-bottom leading-tight break-words">UPS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {upsFiltered.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-16 text-slate-500">
+                        {search ? "No UPS found matching your search" : "No UPS data available"}
+                      </td>
+                    </tr>
+                  ) : (
+                    upsFiltered.map((d, i) => {
+                      const downKey = pdbTimeKey(d, "down", false);
+                      const upKey = pdbTimeKey(d, "up", false);
+                      const down24Key = pdbTimeKey(d, "down", true);
+                      const up24Key = pdbTimeKey(d, "up", true);
+                      const isDown = pdbIsDown(d);
+                      const isUp = pdbIsUp(d);
+                      const noSignal = pdbHasNoSignal(d);
+                      const lastSeenVal = pdbPick(d, "last_seen_at", "last_seen", "lastseen");
+                      const upsVal = pdbPick(d, "ups", "ups1", "ups_voltage");
+                      return (
+                        <tr
+                          key={d.sa_code || i}
+                          onClick={() => d.sa_code && setHistoryUpsSa(d.sa_code)}
+                          className={`cursor-pointer transition-colors border-l-2 ${
+                            noSignal
+                              ? "bg-red-500/10 hover:bg-red-500/15 border-l-red-500"
+                              : "hover:bg-slate-800/30 border-l-blue-500/20"
+                          }`}
+                        >
+                          <td className="px-1.5 py-3 text-slate-500 font-mono text-xs">
+                            <span className="flex items-center gap-1.5">
+                              {noSignal && <NoSignalIcon lastSeen={lastSeenVal} />}
+                              {i + 1}
+                            </span>
+                          </td>
+                          <td
+                            className="px-1.5 py-3 text-white font-medium text-sm leading-tight break-words"
+                            title={d.sa_name || ""}
+                          >
+                            {d.sa_name || "—"}
+                          </td>
+                          <td className="px-1.5 py-3">
+                            <SaStatusBadge status={pdbRawStatus(d) ?? "—"} />
+                          </td>
+                          <td className={`px-1.5 py-3 font-mono text-xs ${isDown ? "text-red-400" : "text-slate-400"}`}>
+                            {formatSeconds(downKey ? d[downKey] : null)}
+                          </td>
+                          <td className={`px-1.5 py-3 font-mono text-xs ${isUp ? "text-emerald-400" : "text-slate-400"}`}>
+                            {formatSeconds(upKey ? d[upKey] : null)}
+                          </td>
+                          <td className="px-1.5 py-3 font-mono text-xs text-orange-400/80">
+                            {formatSeconds(down24Key ? d[down24Key] : null)}
+                          </td>
+                          <td className="px-1.5 py-3 font-mono text-xs text-teal-400/80">
+                            {formatSeconds(up24Key ? d[up24Key] : null)}
+                          </td>
+                          <td className="px-1.5 py-3 font-mono text-xs text-blue-400 font-semibold">
+                            {upsVal === null ? "—" : `${pdbNum(upsVal)}V`}
                           </td>
                         </tr>
                       );
@@ -1421,6 +1580,10 @@ export default function DashboardPage({
 
       {historyPdbSa && (
         <PdbEventsModal saCode={historyPdbSa} onClose={() => setHistoryPdbSa(null)} />
+      )}
+
+      {historyUpsSa && (
+        <UpsEventsModal saCode={historyUpsSa} onClose={() => setHistoryUpsSa(null)} />
       )}
 
       {showDownSnapshot && (
