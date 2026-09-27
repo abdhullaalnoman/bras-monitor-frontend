@@ -4,8 +4,45 @@ import { formatDateTimeBD } from "../utils/formatters";
 
 const REFRESH_MS = 10000;
 
+// ── Link3-SA palette ────────────────────────────────────────────────────────
+const C = {
+  green: "#4ecdc4",
+  blue: "#3867d6",
+  orange: "#ff9800",
+  yellow: "#fe9b13",
+  red: "#ff5252",
+  redText: "#fc5c65",
+  muted: "#b0d0e8",
+  dim: "#8d8d8d",
+  panel: "#0f1c2d",
+  border: "rgba(78, 205, 196, 0.12)",
+  grid: "rgba(255, 255, 255, 0.06)",
+};
+const MONO = "'JetBrains Mono', 'Courier New', monospace";
+const SANS = "'Open Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+
+const CARD_STYLE = {
+  background: "linear-gradient(145deg, #1a2a3d, #152232)",
+  border: `1px solid ${C.border}`,
+  borderRadius: 16,
+};
+const TILE_STYLE = {
+  background: "linear-gradient(145deg, #1a2a3d, #152232)",
+  border: `1px solid ${C.border}`,
+  borderRadius: 14,
+};
+
+// load Open Sans once (JetBrains Mono is already loaded by App.jsx)
+if (typeof document !== "undefined" && !document.getElementById("sa-open-sans")) {
+  const l = document.createElement("link");
+  l.id = "sa-open-sans";
+  l.rel = "stylesheet";
+  l.href = "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
+  document.head.appendChild(l);
+}
+
+// Gauge zones — same ranges/colours as Link3-SA (PDB, UPS, Battery, Internal Battery)
 const GAUGE_RANGES = {
-  // PDB voltage
   pdb: {
     max: 300,
     bands: [
@@ -15,8 +52,6 @@ const GAUGE_RANGES = {
       { from: 250.01, to: 300, color: "red" },
     ],
   },
-
-  // UPS 1 voltage
   ups1: {
     max: 300,
     bands: [
@@ -26,18 +61,14 @@ const GAUGE_RANGES = {
       { from: 250.01, to: 300, color: "red" },
     ],
   },
-
-  // Battery voltage (placeholder ranges — set your own)
   batt_volt: {
     max: 20,
     bands: [
       { from: 0, to: 11, color: "red" },
-      { from: 11.01, to: 12, color: "yellow" },
-      { from: 12.01, to: 20, color: "green" },
+      { from: 11.1, to: 12, color: "yellow" },
+      { from: 12.1, to: 20, color: "green" },
     ],
   },
-
-
   batt_curr: {
     max: 100,
     bands: [
@@ -46,31 +77,28 @@ const GAUGE_RANGES = {
       { from: 80, to: 100, color: "red" },
     ],
   },
-
   solar_volt: {
+    max: 300,
+    bands: [
+      // { from: 0, to: 20, color: "yellow" },
+      { from: 0, to: 300, color: "green" },
+      // { from: 80, to: 100, color: "red" },
+    ],
+  },
+  solar_curr: {
     max: 100,
     bands: [
-      { from: 0, to: 20, color: "yellow" },
-      { from: 20, to: 80, color: "green" },
-      { from: 80, to: 100, color: "red" },
+      { from: 0, to: 100, color: "green" },
+      // { from: 30, to: 40, color: "yellow" },
+      // { from: 40, to: 50, color: "red" },
     ],
   },
-
-  solar_curr: {
-    max: 50,
-    bands: [
-      { from: 0, to: 30, color: "green" },
-      { from: 30, to: 40, color: "yellow" },
-      { from: 40, to: 50, color: "red" },
-    ],
-  },
-
   internal_batt: {
-    max: 4.4,
+    max: 4.3,
     bands: [
       { from: 0, to: 3.4, color: "red" },
       { from: 3.5, to: 3.7, color: "yellow" },
-      { from:   3.7, to: 4.4, color: "green" },
+      { from: 3.7, to: 4.3, color: "green" },
     ],
   },
 };
@@ -79,20 +107,16 @@ const STATUS_OK_VALUE = 1;
 
 const DECIMAL_PLACES = 2;
 const GAUGES = [
-  { range: "pdb", label: "PDB Voltage", unit: "V", decimal: false, names: ["pdb"] },
-  { range: "ups1", label: "UPS 1 Voltage", unit: "V", decimal: false, names: ["ups1"] },
-  { range: "batt_volt", label: "Battery Voltage", unit: "V", decimal: true, names: ["batt_volt_1", "batt_volt", "battery voltage"] },
-  { range: "batt_curr", label: "Battery Current", unit: "A", decimal: true, names: ["batt_curr_1", "batt_curr", "battery current"] },
-  { range: "solar_volt", label: "Solar Voltage", unit: "V", decimal: true, names: ["solar_volt", "solar voltage"] },
-  { range: "solar_curr", label: "Solar Current", unit: "A", decimal: true, names: ["solar_curr", "solar current"] },
-  { range: "internal_batt", label: "Internal Battery", unit: "V", decimal: true, names: ["internal_batt", "Internal Battery"] },
+  { range: "pdb", label: "PDB Voltage", icon: "bolt", unit: "V", decimal: false, names: ["pdb"] },
+  { range: "ups1", label: "UPS Voltage", icon: "plug", unit: "V", decimal: false, names: ["ups1"] },
+  { range: "batt_volt", label: "Battery Voltage", icon: "battery", unit: "V", decimal: true, names: ["batt_volt_1", "batt_volt", "battery voltage"] },
+  { range: "batt_curr", label: "Battery Current", icon: "bolt", unit: "A", decimal: true, names: ["batt_curr_1", "batt_curr", "battery current"] },
+  { range: "solar_volt", label: "Solar Voltage", icon: "sun", unit: "V", decimal: false, names: ["solar_volt", "solar voltage"] },
+  { range: "solar_curr", label: "Solar Current", icon: "sun", unit: "A", decimal: true, names: ["solar_curr", "solar current"] },
+  { range: "internal_batt", label: "Internal Battery", icon: "battery", unit: "V", decimal: true, names: ["internal_batt", "Internal Battery"] },
 ];
 
-const COLORS = {
-  green: { hex: "#10b981", label: "Normal" },
-  yellow: { hex: "#f59e0b", label: "Warning" },
-  red: { hex: "#ef4444", label: "Critical" },
-};
+const ZONE_HEX = { green: C.green, yellow: C.yellow, red: C.red };
 
 const ICONS = {
   operator:
@@ -101,15 +125,31 @@ const ICONS = {
   calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
   counter: "M7 20l4-16m2 16l4-16M6 9h14M4 15h14",
   bolt: "M13 10V3L4 14h7v7l9-11h-7z",
+  plug: "M9 3v4m6-4v4M7 7h10v4a5 5 0 01-10 0V7zm5 9v5",
+  battery: "M3 9h15a1 1 0 011 1v4a1 1 0 01-1 1H3a1 1 0 01-1-1v-4a1 1 0 011-1zm18 2v2",
+  sun: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z",
   server:
     "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
+  chart: "M3 3v18h18M7 14l4-4 4 4 5-6",
+  info: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
 };
 
-function Icon({ name }) {
+function Icon({ name, size = 16, color }) {
   return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg width={size} height={size} fill="none" stroke={color || "currentColor"} viewBox="0 0 24 24" className="shrink-0">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS[name]} />
     </svg>
+  );
+}
+
+function CardTitle({ icon, children }) {
+  return (
+    <div className="flex items-center gap-2 mb-3.5" style={{ fontSize: "1rem", fontWeight: 600, color: "#fff" }}>
+      <span style={{ color: C.green, display: "inline-flex" }}>
+        <Icon name={icon} />
+      </span>
+      {children}
+    </div>
   );
 }
 
@@ -143,9 +183,10 @@ function fmtValue(v, decimal) {
   return decimal ? n.toFixed(DECIMAL_PLACES) : String(Math.round(n));
 }
 
-function bandColorFor(value, range) {
-  const band = range.bands.find((b) => value >= b.from && value <= b.to);
-  return band ? band.color : "red";
+// zone colour for a value; values in the small gaps between zones fall into the next zone up
+function zoneColorFor(value, range) {
+  const band = range.bands.find((b) => value <= b.to);
+  return ZONE_HEX[(band || range.bands[range.bands.length - 1]).color];
 }
 
 function fmtTime(iso) {
@@ -187,82 +228,99 @@ function fmtClockSec(d) {
   }
 }
 
-function SectionTitle({ children }) {
-  return <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">{children}</h2>;
-}
-
-// ── Gauge (ring, colour + status by range — like hams updateGauge) ──────────
-function Gauge({ label, unit, value, range, decimal }) {
+// ── Gauge (ring — Link3-SA look: thin rounded arc, faint track, zone colour) ─
+function Gauge({ label, icon, unit, value, range, decimal }) {
   const size = 130;
   const cx = size / 2;
-  const r = 48;
+  const r = 52;
   const c = 2 * Math.PI * r;
   const max = range.max > 0 ? range.max : 1;
 
   const n = toNum(value);
   const hasValue = n !== null;
-  const colorKey = hasValue ? bandColorFor(n, range) : null;
-  const color = colorKey ? COLORS[colorKey].hex : "#475569";
+  const color = hasValue ? zoneColorFor(n, range) : C.green;
   const frac = hasValue ? Math.min(Math.max(n / max, 0), 1) : 0;
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl px-2 py-3 flex flex-col items-center min-w-0">
-      <div className="text-slate-400 text-xs font-medium mb-1 text-center leading-tight">{label}</div>
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[128px] h-auto">
-        <circle cx={cx} cy={cx} r={r} fill="none" stroke="#1e293b" strokeWidth="10" />
+    <div className="flex flex-col items-center min-w-0" style={{ ...CARD_STYLE, padding: 12 }}>
+      <div
+        className="flex items-center gap-1.5 w-full justify-center whitespace-nowrap"
+        style={{ fontSize: "0.82rem", fontWeight: 600, color: "#fff", marginBottom: 6 }}
+      >
+        <span style={{ color: C.green, display: "inline-flex" }}>
+          <Icon name={icon} size={14} />
+        </span>
+        <span className="truncate">{label}</span>
+      </div>
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[150px] h-auto">
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={C.grid} strokeWidth="8" />
         <circle
           cx={cx}
           cy={cx}
           r={r}
           fill="none"
           stroke={color}
-          strokeWidth="10"
+          strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={`${frac * c} ${c}`}
           transform={`rotate(-90 ${cx} ${cx})`}
           style={{ transition: "stroke-dasharray 0.6s ease, stroke 0.3s ease" }}
         />
-        <text x={cx} y={cx + 3} textAnchor="middle" fill="#f8fafc" fontSize={decimal ? 20 : 22} fontWeight="700">
-          {fmtValue(value, decimal)}
-        </text>
-        <text x={cx} y={cx + 20} textAnchor="middle" fill="#94a3b8" fontSize="11">
-          {hasValue ? unit : ""}
+        <text x={cx} y={cx + 6} textAnchor="middle" fill="#fff" fontSize="17" fontWeight="700" fontFamily={MONO}>
+          {hasValue ? `${fmtValue(value, decimal)}${unit}` : "--"}
         </text>
       </svg>
-      <div className="text-xs font-semibold" style={{ color }}>
-        {hasValue ? COLORS[colorKey].label : "No Data"}
-      </div>
-      <div className="text-slate-600 text-[11px] mt-0.5 font-mono">
-        0 – {max} {unit}
+      <div style={{ fontFamily: MONO, fontSize: "0.7rem", color: C.muted, opacity: 0.75, marginTop: -2 }}>
+        0 – {max}
+        {unit}
       </div>
     </div>
   );
 }
 
-// ── Grouped bar chart: Temperature + Humidity in ONE chart, ALL points ──────
+// ── Line chart: Temperature + Humidity in ONE chart, ALL points ─────────────
 // Fixed height; the width follows the card so every reading gets a slot.
 const CHART_HEIGHT = 290; // <- chart height in px (make smaller / bigger here)
-const MAX_BAR_WIDTH = 26; // <- pillar width in px (make thinner / thicker here)
 
-// bar with rounded top corners only
-function barPath(x, y, w, h, r) {
-  const rr = Math.min(r, w / 2, h);
-  return `M${x},${y + h} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + h} Z`;
+function buildSegments(pts) {
+  const segs = [];
+  let cur = [];
+  pts.forEach((p) => {
+    if (p) cur.push(p);
+    else if (cur.length) {
+      segs.push(cur);
+      cur = [];
+    }
+  });
+  if (cur.length) segs.push(cur);
+  return segs;
 }
 
-function EnvBarChart({ labels, series }) {
+function linePath(seg) {
+  if (seg.length === 1) return `M${seg[0].x},${seg[0].y}`;
+  let d = `M${seg[0].x},${seg[0].y}`;
+  for (let i = 1; i < seg.length; i += 1) {
+    const p0 = seg[i - 1];
+    const p1 = seg[i];
+    const mx = (p0.x + p1.x) / 2;
+    d += ` C${mx},${p0.y} ${mx},${p1.y} ${p1.x},${p1.y}`;
+  }
+  return d;
+}
+
+function EnvLineChart({ labels, series }) {
   const H = CHART_HEIGHT;
-  const padL = 44;
+  const padL = 40;
   const padR = 16;
-  const padT = 30;
+  const padT = 20;
   const padB = 46;
   const [hover, setHover] = useState(null);
-  const [W, setW] = useState(900);
+  const [W, setW] = useState(600);
   const wrapRef = useRef(null);
   const svgRef = useRef(null);
   const uid = useId().replace(/:/g, "");
 
-  // keep the SVG 1:1 with the card width, so text and bars never get scaled
+  // keep the SVG 1:1 with the card width, so text and lines never get scaled
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return undefined;
@@ -277,22 +335,24 @@ function EnvBarChart({ labels, series }) {
     return () => ro.disconnect();
   }, []);
 
-  // every reading in the response gets a slot, even if the arrays differ in length
+  // every reading in the response gets a point, even if the arrays differ in length
   const n = Math.max(labels.length, ...series.map((s) => s.values.length));
-  const nums = series.flatMap((s) => s.values).filter((v) => v !== null);
+  const nums = series.flatMap((s) => s.values).filter((v) => v !== null && v !== undefined);
   const rawMax = nums.length ? Math.max(...nums) : 10;
   const yMax = Math.max(10, Math.ceil((rawMax * 1.15) / 10) * 10);
 
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
-  const groupW = n > 0 ? innerW / n : innerW;
-  const gap = 5; // space between the two bars of a reading
-  const barW = Math.max(8, Math.min(MAX_BAR_WIDTH, (groupW - 16 - gap * (series.length - 1)) / series.length));
-  const clusterW = barW * series.length + gap * (series.length - 1);
+  const edge = 10; // small gap between the y-axis / right edge and first / last point
+  const step = n > 1 ? (innerW - edge * 2) / (n - 1) : 0;
+  const xAt = (i) => (n > 1 ? padL + edge + i * step : padL + innerW / 2);
   const yAt = (v) => padT + (1 - v / yMax) * innerH;
   const yBase = padT + innerH;
-  const showValues = groupW >= 64;
-  const rotate = groupW < 40;
+
+  const slot = n > 1 ? step : innerW;
+  const showDots = slot >= 14;
+  const rotate = slot < 40;
+  const labelStep = rotate ? Math.max(1, Math.ceil(14 / slot)) : Math.max(1, Math.ceil(44 / slot));
 
   const yTicks = Array.from({ length: 5 }, (_, i) => (yMax * i) / 4);
 
@@ -306,28 +366,31 @@ function EnvBarChart({ labels, series }) {
     if (!svgRef.current || n === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
     const xv = e.clientX - rect.left;
-    const idx = Math.floor((xv - padL) / groupW);
+    const idx = n > 1 ? Math.round((xv - padL - edge) / step) : 0;
     setHover(idx >= 0 && idx < n ? idx : null);
   }
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-      <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
+    <div className="h-full" style={{ ...CARD_STYLE, padding: 16 }}>
+      <div className="flex items-start justify-between flex-wrap gap-3 mb-2">
         <div>
-          <div className="text-slate-100 text-base font-semibold">Temperature &amp; Humidity</div>
-          <div className="text-slate-500 text-xs mt-0.5">Last {n} readings</div>
+          <CardTitle icon="chart">Temperature &amp; Humidity</CardTitle>
+          <div style={{ fontSize: "0.72rem", color: C.dim, marginTop: -8 }}>Last {n} readings</div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {series.map((s) => (
             <div
               key={s.name}
-              className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-lg px-3 py-1.5"
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+              style={{ background: "rgba(56, 103, 214, 0.12)", border: "1px solid rgba(56, 103, 214, 0.28)" }}
             >
-              <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} />
-              <span className="text-slate-400 text-xs">{s.name}</span>
-              <span className="text-white text-sm font-semibold">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+              <span style={{ color: C.muted, fontSize: "0.72rem" }}>{s.name}</span>
+              <span style={{ color: "#fff", fontSize: "0.82rem", fontWeight: 700, fontFamily: MONO }}>
                 {fmtValue(latest(s), s.decimal)}
-                <span className="text-slate-500 text-xs font-normal ml-0.5">{latest(s) === null ? "" : s.unit}</span>
+                <span style={{ color: C.dim, fontSize: "0.7rem", fontWeight: 400, marginLeft: 2 }}>
+                  {latest(s) === null ? "" : s.unit}
+                </span>
               </span>
             </div>
           ))}
@@ -336,7 +399,7 @@ function EnvBarChart({ labels, series }) {
 
       <div ref={wrapRef} className="w-full">
         {n === 0 ? (
-          <div className="flex items-center justify-center text-slate-500 text-sm" style={{ height: H }}>
+          <div className="flex items-center justify-center text-sm" style={{ height: H, color: C.muted }}>
             No chart data
           </div>
         ) : (
@@ -351,9 +414,9 @@ function EnvBarChart({ labels, series }) {
           >
             <defs>
               {series.map((s, i) => (
-                <linearGradient key={i} id={`${uid}-b${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={s.color} stopOpacity="1" />
-                  <stop offset="100%" stopColor={s.color} stopOpacity="0.55" />
+                <linearGradient key={i} id={`${uid}-a${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={s.color} stopOpacity="0.32" />
+                  <stop offset="100%" stopColor={s.color} stopOpacity="0.02" />
                 </linearGradient>
               ))}
             </defs>
@@ -366,81 +429,97 @@ function EnvBarChart({ labels, series }) {
                   x2={W - padR}
                   y1={yAt(t)}
                   y2={yAt(t)}
-                  stroke={i === 0 ? "#334155" : "#1e293b"}
+                  stroke={C.grid}
                   strokeWidth="1"
                   strokeDasharray={i === 0 ? "0" : "3 4"}
                 />
-                <text x={padL - 10} y={yAt(t) + 4} textAnchor="end" fill="#64748b" fontSize="11">
+                <text x={padL - 8} y={yAt(t) + 4} textAnchor="end" fill={C.muted} fontSize="11">
                   {Math.round(t)}
                 </text>
               </g>
             ))}
 
-            {/* hover highlight */}
-            {hover !== null && (
-              <rect x={padL + hover * groupW + 2} y={padT} width={groupW - 4} height={innerH} rx="6" fill="#94a3b8" fillOpacity="0.08" />
-            )}
-
-            {/* bars — every data point */}
+            {/* x labels: time (+ date) */}
             {Array.from({ length: n }, (_, i) => {
               const l = labels[i];
-              const cxg = padL + i * groupW + groupW / 2;
-              const gx = cxg - clusterW / 2;
-              return (
+              if (!l || i % labelStep !== 0) return null;
+              const x = xAt(i);
+              return rotate ? (
+                <text key={i} transform={`translate(${x},${yBase + 14}) rotate(-50)`} textAnchor="end" fill={C.muted} fontSize="10">
+                  {fmtTime(l)}
+                </text>
+              ) : (
                 <g key={i}>
-                  {series.map((s, si) => {
-                    const v = s.values[i];
-                    if (v === null || v === undefined) return null;
-                    const bx = gx + si * (barW + gap);
-                    const by = yAt(v);
-                    return (
-                      <g key={s.name}>
-                        <path d={barPath(bx, by, barW, Math.max(yBase - by, 1), 5)} fill={`url(#${uid}-b${si})`} />
-                        {showValues && (
-                          <text x={bx + barW / 2} y={by - 6} textAnchor="middle" fill="#cbd5e1" fontSize="11" fontWeight="600">
-                            {fmtValue(v, s.decimal)}
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-
-                  {/* x label: time (+ date) */}
-                  {l &&
-                    (rotate ? (
-                      <text
-                        transform={`translate(${cxg},${yBase + 14}) rotate(-50)`}
-                        textAnchor="end"
-                        fill="#64748b"
-                        fontSize="10"
-                      >
-                        {fmtTime(l)}
-                      </text>
-                    ) : (
-                      <>
-                        <text x={cxg} y={yBase + 17} textAnchor="middle" fill="#94a3b8" fontSize="11">
-                          {fmtTime(l)}
-                        </text>
-                        <text x={cxg} y={yBase + 31} textAnchor="middle" fill="#64748b" fontSize="10">
-                          {fmtDay(l)}
-                        </text>
-                      </>
-                    ))}
+                  <text x={x} y={yBase + 17} textAnchor="middle" fill={C.muted} fontSize="11">
+                    {fmtTime(l)}
+                  </text>
+                  <text x={x} y={yBase + 31} textAnchor="middle" fill={C.dim} fontSize="10">
+                    {fmtDay(l)}
+                  </text>
                 </g>
               );
             })}
+
+            {/* area + line for each series */}
+            {series.map((s, si) => {
+              const pts = Array.from({ length: n }, (_, i) => {
+                const v = s.values[i];
+                return v === null || v === undefined ? null : { x: xAt(i), y: yAt(v), v };
+              });
+              const segs = buildSegments(pts);
+              return (
+                <g key={s.name}>
+                  {segs.map((seg, k) =>
+                    seg.length > 1 ? (
+                      <path
+                        key={`a${k}`}
+                        d={`${linePath(seg)} L${seg[seg.length - 1].x},${yBase} L${seg[0].x},${yBase} Z`}
+                        fill={`url(#${uid}-a${si})`}
+                      />
+                    ) : null
+                  )}
+                  {segs.map((seg, k) => (
+                    <path
+                      key={`l${k}`}
+                      d={linePath(seg)}
+                      fill="none"
+                      stroke={s.color}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ))}
+                  {showDots &&
+                    pts.map((p, i) =>
+                      p ? <circle key={i} cx={p.x} cy={p.y} r="3" fill="#152232" stroke={s.color} strokeWidth="2" /> : null
+                    )}
+                </g>
+              );
+            })}
+
+            {/* hover crosshair + highlighted points */}
+            {hover !== null && (
+              <g>
+                <line x1={xAt(hover)} x2={xAt(hover)} y1={padT} y2={yBase} stroke={C.green} strokeOpacity="0.35" strokeDasharray="3 3" />
+                {series.map((s) => {
+                  const v = s.values[hover];
+                  if (v === null || v === undefined) return null;
+                  return <circle key={s.name} cx={xAt(hover)} cy={yAt(v)} r="5" fill={s.color} stroke="#fff" strokeWidth="1.5" />;
+                })}
+              </g>
+            )}
 
             {/* tooltip */}
             {hover !== null &&
               (() => {
                 const boxW = 168;
                 const boxH = 28 + series.length * 18;
-                const cxg = padL + hover * groupW + groupW / 2;
-                const bx = cxg > W / 2 ? cxg - boxW - groupW / 2 - 4 : cxg + groupW / 2 + 4;
+                const x0 = xAt(hover);
+                const bx = x0 > W / 2 ? x0 - boxW - 12 : x0 + 12;
                 return (
                   <g>
-                    <rect x={bx} y={padT} width={boxW} height={boxH} rx="8" fill="#0f172a" stroke="#334155" />
-                    <text x={bx + 10} y={padT + 18} fill="#cbd5e1" fontSize="11">
+                    <rect x={bx} y={padT} width={boxW} height={boxH} rx="8" fill={C.panel} stroke="rgba(78, 205, 196, 0.3)" />
+                    <text x={bx + 10} y={padT + 18} fill={C.muted} fontSize="11">
                       {labels[hover] ? formatDateTimeBD(labels[hover]) : `Reading ${hover + 1}`}
                     </text>
                     {series.map((s, i) => (
@@ -458,35 +537,97 @@ function EnvBarChart({ labels, series }) {
   );
 }
 
-// ── Device information component (label + value, hams device-wrapper-card) ──
-function InfoCard({ icon, label, children, alert }) {
+// ── Device information tiles (icon badge + label + big value, tone by state) ─
+const TONES = {
+  ok: { c: C.green, bg: "rgba(78, 205, 196, 0.14)", bd: "rgba(78, 205, 196, 0.32)" },
+  fail: { c: C.redText, bg: "rgba(252, 92, 101, 0.16)", bd: "rgba(252, 92, 101, 0.4)" },
+  warn: { c: C.yellow, bg: "rgba(254, 155, 19, 0.15)", bd: "rgba(254, 155, 19, 0.38)" },
+  info: { c: "#8fb2ff", bg: "rgba(56, 103, 214, 0.18)", bd: "rgba(56, 103, 214, 0.4)" },
+  na: { c: C.dim, bg: "rgba(141, 141, 141, 0.12)", bd: "rgba(141, 141, 141, 0.25)" },
+};
+
+function InfoTile({ icon, label, tone = "info", children }) {
+  const t = TONES[tone];
+  const failed = tone === "fail";
   return (
     <div
-      className={`rounded-xl border px-4 py-3.5 flex items-center gap-3 bg-slate-900/60 ${
-        alert ? "border-red-500/40" : "border-slate-800"
-      }`}
+      className="relative overflow-hidden flex items-center gap-2.5 min-w-0"
+      style={{
+        ...TILE_STYLE,
+        padding: "8px 12px 8px 14px",
+        borderColor: failed ? "rgba(252, 92, 101, 0.45)" : C.border,
+        background: failed
+          ? "linear-gradient(145deg, rgba(252, 92, 101, 0.14), #152232)"
+          : TILE_STYLE.background,
+      }}
     >
-      <span className="w-9 h-9 shrink-0 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center">
-        <Icon name={icon} />
+      {/* left accent bar */}
+      <span
+        className="absolute left-0 top-0 bottom-0"
+        style={{ width: 3, background: t.c, opacity: tone === "na" ? 0.4 : 0.9 }}
+      />
+      {/* icon badge */}
+      <span
+        className="shrink-0 flex items-center justify-center"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          background: t.bg,
+          border: `1px solid ${t.bd}`,
+          color: t.c,
+        }}
+      >
+        <Icon name={icon} size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-slate-500 text-xs">{label}</div>
-        <div className="mt-0.5">{children}</div>
+        <div
+          className="truncate"
+          style={{ fontSize: "0.62rem", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: C.dim }}
+        >
+          {label}
+        </div>
+        <div className="mt-0.5 min-w-0">{children}</div>
       </div>
     </div>
   );
 }
 
-function StatusText({ value }) {
+const VALUE_STYLE = { fontFamily: MONO, fontSize: "0.92rem", fontWeight: 700, color: "#fff", lineHeight: 1.2 };
+
+function StatusValue({ value }) {
   const v = toNum(value);
-  if (v === null) return <span className="text-slate-500 text-base font-semibold">N/A</span>;
-  const isOk = v === STATUS_OK_VALUE;
+  if (v === null) return <span style={{ ...VALUE_STYLE, color: C.dim }}>N/A</span>;
+  const ok = v === STATUS_OK_VALUE;
+  const col = ok ? C.green : C.redText;
   return (
-    <span className={`inline-flex items-center gap-2 text-base font-semibold ${isOk ? "text-emerald-400" : "text-red-400"}`}>
-      <span className={`w-2 h-2 rounded-full ${isOk ? "bg-emerald-400" : "bg-red-400"}`} />
-      {isOk ? "OK" : "Failed"}
+    <span className="inline-flex items-center gap-2" style={{ ...VALUE_STYLE, color: col }}>
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: col,
+          boxShadow: `0 0 8px ${col}`,
+          animation: ok ? "saPulse 1.6s infinite" : "none",
+        }}
+      />
+      {ok ? "OK" : "Failed"}
     </span>
   );
+}
+
+const statusTone = (v) => {
+  const n = toNum(v);
+  if (n === null) return "na";
+  return n === STATUS_OK_VALUE ? "ok" : "fail";
+};
+
+// Signal colour bands (same as Link3-SA): 0–40 red, 41–60 yellow, above 60 green
+function signalTone(p) {
+  if (p <= 40) return "fail";
+  if (p <= 60) return "warn";
+  return "ok";
 }
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -551,18 +692,40 @@ export default function DeviceDashboardPage({ router, onClose }) {
   const psu2 = pick(data, "psu2");
   const server1 = pick(data, "server1");
   const server2 = pick(data, "server2");
-  const isFailed = (v) => toNum(v) !== null && toNum(v) !== STATUS_OK_VALUE;
   const signal = toNum(pick(data, "signal_strength"));
+  const signalPct = signal === null ? null : Math.min(Math.max(Math.round(signal), 0), 100);
+  const sigTone = signalPct === null ? "na" : signalTone(signalPct);
+  const isLive = !error && !!data;
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#080c18] text-white">
+    <div
+      className="fixed inset-0 z-[60] overflow-y-auto text-white"
+      style={{
+        fontFamily: SANS,
+        background: "radial-gradient(circle at 15% 0%, #142338 0%, #0a141f 55%, #070d16 100%)",
+      }}
+    >
+      <style>{`
+        @keyframes saPing { 0% { transform: scale(0.4); opacity: 0.8; } 100% { transform: scale(1.25); opacity: 0; } }
+        @keyframes saPulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(1.4); } 100% { opacity: 1; transform: scale(1); } }
+      `}</style>
+
       {/* Top Nav */}
-      <nav className="sticky top-0 z-40 bg-[#0a0e1a]/95 backdrop-blur border-b border-slate-800">
+      <nav
+        className="sticky top-0 z-40"
+        style={{
+          background: "rgba(15, 28, 45, 0.6)",
+          backdropFilter: "blur(14px)",
+          WebkitBackdropFilter: "blur(14px)",
+          borderBottom: `1px solid ${C.border}`,
+        }}
+      >
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={onClose}
-              className="w-9 h-9 shrink-0 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-all"
+              className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center transition-all"
+              style={{ ...CARD_STYLE, borderRadius: 10, color: "#fff" }}
               title="Back"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -570,22 +733,42 @@ export default function DeviceDashboardPage({ router, onClose }) {
               </svg>
             </button>
             <div className="min-w-0">
-              <div className="text-base font-black tracking-tight truncate" style={{ fontFamily: "'Rajdhani', sans-serif" }}>
-                DASHBOARD{router?.bts_name ? `: ${router.bts_name}` : ""}
+              <div className="truncate" style={{ fontSize: "1.2rem", fontWeight: 700 }}>
+                {router?.bts_name ? router.bts_name : "Dashboard"}
               </div>
-              {btsCode && <div className="text-xs text-slate-500 font-mono">{btsCode}</div>}
+              {btsCode && (
+                <div style={{ fontFamily: MONO, fontSize: "0.72rem", color: C.muted }}>{btsCode}</div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
+            {btsCode && (
+              <span
+                className="flex items-center gap-1.5"
+                style={{ fontSize: "0.72rem", color: isLive ? C.green : C.redText }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "currentColor",
+                    animation: isLive ? "saPulse 1.6s infinite" : "none",
+                  }}
+                />
+                {/* {isLive ? "Live" : loading ? "Connecting…" : "Disconnected"} */}
+              </span>
+            )}
             {updatedAt && (
-              <span className="hidden sm:inline text-xs text-slate-500">
-                Updated {fmtClockSec(updatedAt)} · next in {countdown}s
+              <span className="hidden sm:inline" style={{ fontFamily: MONO, fontSize: "0.75rem", color: C.muted }}>
+                Refresh in {countdown}s
               </span>
             )}
             <button
               onClick={fetchData}
-              className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-cyan-400 transition-all"
+              className="w-9 h-9 flex items-center justify-center transition-all"
+              style={{ ...CARD_STYLE, borderRadius: 10, color: C.green }}
               title="Refresh now"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -601,102 +784,122 @@ export default function DeviceDashboardPage({ router, onClose }) {
         </div>
       </nav>
 
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>
+          <div
+            className="rounded-xl px-4 py-3 text-sm"
+            style={{ background: "rgba(252, 92, 101, 0.12)", border: "1px solid rgba(252, 92, 101, 0.35)", color: C.redText }}
+          >
+            {error}
+          </div>
         )}
 
         {!btsCode ? (
-          <div className="text-center text-slate-500 py-24">
+          <div className="text-center py-24" style={{ color: C.dim }}>
             This SA has no PDB Monitoring Device!
           </div>
         ) : loading && !data ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <svg className="w-9 h-9 animate-spin text-cyan-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <div className="flex flex-col items-center justify-center gap-4 h-72">
+            <div className="relative flex items-center justify-center" style={{ width: 96, height: 96 }}>
+              {[40, 66, 92].map((s, i) => (
+                <span
+                  key={s}
+                  className="absolute rounded-full"
+                  style={{
+                    width: s,
+                    height: s,
+                    border: `2px solid ${C.green}`,
+                    opacity: 0,
+                    animation: `saPing 2.2s ease-out ${i * 0.55}s infinite`,
+                  }}
+                />
+              ))}
+              <svg width="34" height="34" fill="none" stroke={C.green} viewBox="0 0 24 24" style={{ zIndex: 2 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.operator} />
               </svg>
-              <p className="text-slate-400 text-sm">Loading device data...</p>
             </div>
+            <p style={{ fontSize: "0.9rem", color: C.muted }}>
+              Waiting for live data from <strong style={{ color: "#fff", fontFamily: MONO }}>{btsCode}</strong>…
+            </p>
           </div>
         ) : data ? (
           <>
-            <section>
-              <SectionTitle>Power</SectionTitle>
-              <div className="overflow-x-auto pb-1">
-                <div className="grid grid-cols-7 gap-3" style={{ minWidth: "880px" }}>
-                  {GAUGES.map((g) => (
-                    <Gauge
-                      key={g.range}
-                      label={g.label}
-                      unit={g.unit}
-                      decimal={g.decimal}
-                      value={pick(data, ...g.names)}
-                      range={GAUGE_RANGES[g.range]}
-                    />
-                  ))}
-                </div>
+            {/* Gauges */}
+            <section className="overflow-x-auto pb-1">
+              <div className="grid grid-cols-7 gap-3.5" style={{ minWidth: "980px" }}>
+                {GAUGES.map((g) => (
+                  <Gauge
+                    key={g.range}
+                    label={g.label}
+                    icon={g.icon}
+                    unit={g.unit}
+                    decimal={g.decimal}
+                    value={pick(data, ...g.names)}
+                    range={GAUGE_RANGES[g.range]}
+                  />
+                ))}
               </div>
             </section>
 
-            {/* One bar chart — temperature + humidity */}
-            <section>
-              <SectionTitle>Environment</SectionTitle>
-              <EnvBarChart
-                labels={chartLabels}
-                series={[
-                  { name: "Temperature", unit: "°C", decimal: true, color: "#fb923c", values: toSeries(charts?.temperature?.temp1) },
-                  { name: "Humidity", unit: "%", decimal: false, color: "#38bdf8", values: toSeries(charts?.humidity?.hum1) },
-                ]}
-              />
-            </section>
+            {/* Half row: Temperature + Humidity line chart | Half row: Device Information */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 items-stretch" style={{ gap: 18 }}>
+              <div className="min-w-0">
+                <EnvLineChart
+                  labels={chartLabels}
+                  series={[
+                    { name: "Temperature", unit: "°C", decimal: true, color: C.orange, values: toSeries(charts?.temperature?.temp1) },
+                    { name: "Humidity", unit: "%", decimal: false, color: C.blue, values: toSeries(charts?.humidity?.hum1) },
+                  ]}
+                />
+              </div>
 
-            {/* Device information — bottom of the page, one component per item */}
-            <section>
-              <SectionTitle>Device Information</SectionTitle>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                {/* Top row: PSU 1, PSU 2, Server 1, Server 2 */}
-                <InfoCard icon="bolt" label="PSU 1" alert={isFailed(psu1)}>
-                  <StatusText value={psu1} />
-                </InfoCard>
+              <div className="min-w-0 flex flex-col" style={{ ...CARD_STYLE, padding: 16 }}>
+                <CardTitle icon="info">Device Information</CardTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 flex-1 content-between">
+                  <InfoTile icon="bolt" label="PSU 1" tone={statusTone(psu1)}>
+                    <StatusValue value={psu1} />
+                  </InfoTile>
 
-                <InfoCard icon="bolt" label="PSU 2" alert={isFailed(psu2)}>
-                  <StatusText value={psu2} />
-                </InfoCard>
+                  <InfoTile icon="bolt" label="PSU 2" tone={statusTone(psu2)}>
+                    <StatusValue value={psu2} />
+                  </InfoTile>
 
-                <InfoCard icon="server" label="Server 1" alert={isFailed(server1)}>
-                  <StatusText value={server1} />
-                </InfoCard>
+                  <InfoTile icon="server" label="Server 1" tone={statusTone(server1)}>
+                    <StatusValue value={server1} />
+                  </InfoTile>
 
-                <InfoCard icon="server" label="Server 2" alert={isFailed(server2)}>
-                  <StatusText value={server2} />
-                </InfoCard>
+                  <InfoTile icon="server" label="Server 2" tone={statusTone(server2)}>
+                    <StatusValue value={server2} />
+                  </InfoTile>
 
-                {/* Bottom row: Operator, Signal Strength, Active Since, Data Counter */}
-                <InfoCard icon="operator" label="Operator">
-                  <div className="text-white text-base font-semibold">{pick(data, "operator") || "—"}</div>
-                </InfoCard>
+                  <InfoTile icon="operator" label="Operator" tone="info">
+                    <div className="truncate" style={VALUE_STYLE}>{pick(data, "operator") || "—"}</div>
+                  </InfoTile>
 
-                <InfoCard icon="signal" label="Signal Strength">
-                  <div className="text-white text-base font-semibold">
-                    {signal === null ? "N/A" : `${Math.round(signal)} %`}
-                  </div>
-                  <div className="mt-1.5 h-1 rounded-full bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-slate-400 transition-all"
-                      style={{ width: `${Math.min(Math.max(signal || 0, 0), 100)}%` }}
-                    />
-                  </div>
-                </InfoCard>
+                  <InfoTile icon="signal" label="Signal Strength" tone={sigTone}>
+                    {signalPct === null ? (
+                      <span style={{ ...VALUE_STYLE, color: C.dim }}>N/A</span>
+                    ) : (
+                      <>
+                        <div style={{ ...VALUE_STYLE, color: TONES[sigTone].c }}>{signalPct}%</div>
+                        <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: C.grid }}>
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${signalPct}%`, background: TONES[sigTone].c }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </InfoTile>
 
-                <InfoCard icon="calendar" label="Active Since">
-                  <div className="text-white text-base font-semibold">{pick(data, "active") || "—"}</div>
-                </InfoCard>
+                  <InfoTile icon="calendar" label="Active Since" tone="info">
+                    <div className="truncate" style={{ ...VALUE_STYLE, fontSize: "0.8rem" }}>{pick(data, "active") || "—"}</div>
+                  </InfoTile>
 
-                <InfoCard icon="counter" label="Data Counter">
-                  <div className="text-white text-base font-semibold">{fmtValue(pick(data, "data_counter"), false)}</div>
-                </InfoCard>
+                  <InfoTile icon="counter" label="Data Counter" tone="info">
+                    <div className="truncate" style={VALUE_STYLE}>{fmtValue(pick(data, "data_counter"), false)}</div>
+                  </InfoTile>
+                </div>
               </div>
             </section>
           </>

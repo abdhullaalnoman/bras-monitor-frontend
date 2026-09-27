@@ -93,7 +93,7 @@ export default function BatteryGauge({ soc, capacity, backupHour, compact = fals
         <span
           className={`text-[10px] font-black leading-none ${pct === null ? "text-slate-500" : c.text}`}
         >
-          {pct === null ? "—" : `${Math.round(pct)}%`}
+          {pct === null ? "—" : `${pct.toFixed(2)}%`}
         </span>
 
         {/* Capacity tooltip — shown on hover */}
