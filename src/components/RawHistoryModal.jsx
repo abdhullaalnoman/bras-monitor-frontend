@@ -53,13 +53,13 @@ function fmtRowDateTime(iso) {
 
 // type: "num2" = 2 decimal places, "num0" = rounded integer, "text" = as-is
 const COLUMNS = [
-  { label: "PDB", names: ["pdb"], type: "num0", color: "text-cyan-400", w: 6 },
-  { label: "UPS", names: ["ups1", "ups"], type: "num0", color: "text-blue-400", w: 6 },
+  { label: "PDB", names: ["pdb"], type: "num0", color: "text-cyan-400", w: 5 },
+  { label: "UPS", names: ["ups1", "ups"], type: "num0", color: "text-blue-400", w: 5 },
   { label: "Batt Volt", names: ["batt_volt_1"], type: "num2", color: "text-violet-400", w: 7 },
   { label: "Batt Curr", names: ["batt_curr_1"], type: "num2", color: "text-fuchsia-400", w: 7 },
-  { label: "Solar Volt", names: ["solar_volt"], type: "num0", color: "text-yellow-400", w: 6 },
-  { label: "Solar Curr", names: ["solar_curr"], type: "num2", color: "text-amber-400", w: 6 },
-  { label: "Temp", names: ["temp1"], type: "num2", color: "text-orange-400", w: 6 },
+  { label: "Solar Volt", names: ["solar_volt"], type: "num0", color: "text-yellow-400", w: 5 },
+  { label: "Solar Curr", names: ["solar_curr"], type: "num2", color: "text-amber-400", w: 5 },
+  { label: "Temp", names: ["temp1"], type: "num2", color: "text-orange-400", w: 5 },
   { label: "Hum", names: ["hum1"], type: "num0", color: "text-sky-400", w: 5 },
   { label: "IB", names: ["internal_batt", "Internal Battery"], type: "num2", color: "text-emerald-400", w: 6 },
   { label: "PSU1", names: ["PSU1"], type: "num0", color: "text-teal-400", w: 5 },
@@ -275,7 +275,7 @@ export function RawHistoryModal({ saCode, saName, onClose }) {
               <table className="w-full text-sm table-fixed">
                 <colgroup>
                   <col style={{ width: "2%" }} />
-                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "13%" }} />
                   {COLUMNS.map((col) => (
                     <col key={col.label} style={{ width: `${col.w}%` }} />
                   ))}
@@ -284,20 +284,20 @@ export function RawHistoryModal({ saCode, saName, onClose }) {
                   <tr className="bg-slate-900 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
                     <th className="text-left py-1.5 px-1 font-semibold align-bottom">#</th>
                     <th className="text-left py-1.5 px-1 font-semibold align-bottom leading-tight break-words">
-                      Date &amp; Time   
+                      Date &amp; Time
                     </th>
                     {COLUMNS.map((col) => (
                       <th key={col.label} className="text-left py-1.5 px-1 font-semibold align-bottom leading-tight break-words">
                         {col.label}
                       </th>
                     ))}
-                  </tr> 
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {displayRecords.map((r, i) => (
                     <tr key={pick(r, "id", "_id") ?? i} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-1.5 px-1 text-slate-500 font-mono text-xs">{i + 1}</td>
-                      <td className="py-1.5 px-1 text-slate-400 font-mono text-xs">
+                      <td className="py-1.5 px-1 text-slate-400 font-mono text-xs whitespace-nowrap overflow-hidden">
                         {fmtRowDateTime(pick(r, "created_at", "createdAt", "timestamp", "recorded_at"))}
                       </td>
                       {COLUMNS.map((col) => (

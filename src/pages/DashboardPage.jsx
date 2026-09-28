@@ -235,7 +235,9 @@ function NoSignalIcon({ lastSeen }) {
     const el = wrapRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ top: r.top, left: r.left + r.width / 2 });
+    // Open to the RIGHT of the icon (over the table) so it never runs off the
+    // left edge of the screen; vertically centred on the icon.
+    setPos({ top: r.top + r.height / 2, left: r.right + 8 });
   }
 
   return (
@@ -252,7 +254,7 @@ function NoSignalIcon({ lastSeen }) {
       {pos && (
         <span
           className="fixed whitespace-nowrap rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-[11px] text-slate-200 shadow-xl"
-          style={{ top: pos.top - 8, left: pos.left, transform: "translate(-50%, -100%)", zIndex: 9999 }}
+          style={{ top: pos.top, left: pos.left, transform: "translateY(-50%)", zIndex: 9999 }}
         >
           <span className="block font-semibold text-red-400">No Signal</span>
           <span className="block text-slate-400">Last seen: {formatLastSeenBD(lastSeen)}</span>
